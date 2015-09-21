@@ -3,7 +3,7 @@ from pythonmarketo.helper.exceptions import MarketoException
 import json
 import time
 
-class MarketoClient:    
+class MarketoClient:
     host = None
     client_id = None
     client_secret = None
@@ -15,7 +15,7 @@ class MarketoClient:
     last_request_id = None
     API_CALLS_MADE = 0
     API_LIMIT = None
-    
+
     def __init__(self, host, client_id, client_secret, api_limit=None):
         assert(host is not None)
         assert(client_id is not None)
@@ -42,7 +42,11 @@ class MarketoClient:
                     'get_lead_activity':self.get_lead_activity,
                     'get_paging_token':self.get_paging_token,
                     'update_lead':self.update_lead,
+                    'update_leads':self.update_leads,
                     'create_lead':self.create_lead,
+                    'create_leads':self.create_leads,
+                    'create_or_update_lead':self.create_or_update_lead,
+                    'create_or_update_leads':self.create_or_update_leads,
                     'get_lead_activity_page':self.get_lead_activity_page,
                     'get_email_content_by_id':self.get_email_content_by_id,
                     'get_email_template_content_by_id':self.get_email_template_content_by_id,
@@ -57,19 +61,18 @@ class MarketoClient:
                 602 -> auth token expired
                 '''
                 if e.code in ['601', '602']:
-                   continue   
+                   continue
                 else:
                     raise Exception({'message':e.message, 'code':e.code})    
-            break        
+            break
         return result
-    
 
     def authenticate(self):
         if self.valid_until is not None and\
             self.valid_until > time.time():
             return
-        args = { 
-            'grant_type' : 'client_credentials', 
+        args = {
+            'grant_type' : 'client_credentials',
             'client_id' : self.client_id,
             'client_secret' : self.client_secret
         }
@@ -78,10 +81,10 @@ class MarketoClient:
         self.token = data['access_token']
         self.token_type = data['token_type']
         self.expires_in = data['expires_in']
-        self.valid_until = time.time() + data['expires_in'] 
+        self.valid_until = time.time() + data['expires_in']
         self.scope = data['scope']
 
-    
+
     def get_leads(self, filtr, values = [], fields = []):
         self.authenticate()
         values = values.split() if type(values) is str else values
@@ -113,7 +116,7 @@ class MarketoClient:
         self.last_request_id = data['requestId']
         if not data['success'] : raise MarketoException(data['errors'][0]) 
         return data['result']
-    
+
     def get_email_content_by_id(self, id):
         self.authenticate()
         if id is None: raise ValueError("Invalid argument: required argument id is none.")
@@ -125,7 +128,7 @@ class MarketoClient:
         self.last_request_id = data['requestId']
         if not data['success'] : raise MarketoException(data['errors'][0]) 
         return data['result']
-    
+
     def get_email_template_content_by_id(self, id, status = None):
         self.authenticate()
         if id is None: raise ValueError("Invalid argument: required argument id is none.")
@@ -158,8 +161,8 @@ class MarketoClient:
             result_list.extend(data['result'])
             if len(data['result']) == 0 or 'nextPageToken' not in data:
                 break
-            args['nextPageToken'] = data['nextPageToken']         
-        return result_list    
+            args['nextPageToken'] = data['nextPageToken']
+        return result_list
 
     def get_activity_types(self):
         self.authenticate()
@@ -171,7 +174,6 @@ class MarketoClient:
         if not data['success'] : raise MarketoException(data['errors'][0]) 
         return data['result']
 
-        
     def get_lead_activity_page(self, activityTypeIds, nextPageToken, batchSize = None, listId = None):
         self.authenticate()
         activityTypeIds = activityTypeIds.split() if type(activityTypeIds) is str else activityTypeIds
@@ -201,9 +203,9 @@ class MarketoClient:
             nextPageToken = result['nextPageToken']
             if 'result' in result:
                 activity_result_list.extend(result['result'])
-       
-        return activity_result_list         
-           
+
+        return activity_result_list
+
     def get_paging_token(self, sinceDatetime):
         self.authenticate()
         args = {
@@ -226,6 +228,15 @@ class MarketoClient:
         }
         return self.post(data)
 
+    def update_leads(self, lookupField, values_list):
+        updated_leads = [dict(list(values.items())) for values in values_list]
+        data = {
+            'action' : 'updateOnly',
+            'lookupField' : lookupField,
+            'input' : updated_leads
+        }
+        return self.post(data)
+
     def create_lead(self, lookupField, lookupValue, values):
         new_lead = dict(list({lookupField : lookupValue}.items()) + list(values.items()))
         data = {
@@ -236,7 +247,36 @@ class MarketoClient:
             ]
         }
         return self.post(data)
-           
+
+    def create_leads(self, lookupField, values_list):
+        new_leads = [dict(list(values.items())) for values in values_list]
+        data = {
+            'action' : 'createOnly',
+            'lookupField' : lookupField,
+            'input' : new_leads
+        }
+        return self.post(data)
+
+    def create_or_update_lead(self, lookupField, lookupValue, values):
+        updated_lead = dict(list({lookupField : lookupValue}.items()) + list(values.items()))
+        data = {
+            'action' : 'createOrUpdate',
+            'lookupField' : lookupField,
+            'input' : [
+             updated_lead
+            ]
+        }
+        return self.post(data)
+
+    def create_or_update_leads(self, lookupField, values_list):
+        updated_leads = [dict(list(values.items())) for values in values_list]
+        data = {
+            'action' : 'createOrUpdate',
+            'lookupField' : lookupField,
+            'input' : updated_leads
+        }
+        return self.post(data)
+
     def post(self, data):
         self.authenticate()
         args = {

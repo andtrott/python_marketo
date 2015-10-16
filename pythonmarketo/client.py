@@ -284,5 +284,5 @@ class MarketoClient:
         }
         data = HttpLib().post("https://" + self.host + "/rest/v1/leads.json" , args, data)
         if not data['success'] : raise MarketoException(data['errors'][0])
-        return data['result'][0]['status']
+        return data['result'][0]
         
